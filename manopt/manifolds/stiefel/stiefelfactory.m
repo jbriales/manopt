@@ -146,5 +146,58 @@ function M = stiefelfactory(n, p, k)
     M.vec = @(x, u_mat) u_mat(:);
     M.mat = @(x, u_vec) reshape(u_vec, [n, p, k]);
     M.vecmatareisometries = @() true;
+    
+    M.minvec = @minvec;
+    M.minmat = @minmat;
+    % NOTE: These operators are curre
+    function u = minvec(X,U,X_ort)
+      % CAREFUL: Is null stable and repetitive as for not storing this base?
+      
+      if nargin < 3
+        for i = 1 : k
+          X_ort(:,:,i) = null(X(:,:,i)');
+        end
+      end
+      
+      c_u = cell(k,1);
+      for i = 1 : k
+        a = vec_skew( X(:,:,i)'*U(:,:,i) );
+        b = vec(  X_ort(:,:,i)'*U(:,:,i) );
+        c_u{i} = [a;b];
+      end
+      u = cell2mat(c_u);
+      % Simple code
+%       a = vec_skew( X'*U );
+%       b = vec(  X_ort'*U );
+%       u = [a;b];
+      %         u = [ vec_skew( X'*U )
+      %               vec(  X_ort'*U ) ];
+      % Test:
+      %         A = vec_skew_inv(a);
+      %         B = avec(b,n-p,p);
+      %         Ucheck = X*A + X_ort*B;
+    end
+    function U = minmat(X,u,X_ort)
+      if nargin < 3
+        for i = 1 : k
+          X_ort(:,:,i) = null(X(:,:,i)');
+        end
+      end
+      c_u = mat2cell(u,M.dim()/k * ones(1,k),1);
+      for i = 1 : k
+        n_a = 0.5*p*(p-1);
+        a = c_u{i}(1:n_a);
+        b = c_u{i}(n_a+1:end);
+        A = vec_skew_inv(a);
+        B = avec(b,n-p,p);
+        U(:,:,i) = X(:,:,i)*A + X_ort(:,:,i)*B;
+      end
+%       n_a = 0.5*p*(p-1);
+%       a = u(1:n_a);
+%       b = u(n_a+1:end);
+%       A = vec_skew_inv(a);
+%       B = avec(b,n-p,p);
+%       U = X*A + X_ort*B;
+    end
 
 end
