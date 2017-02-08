@@ -1,7 +1,8 @@
-function lambdas = hessianspectrum(problem, x, usepreconstr, storedb, key)
+function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, storedb, key)
 % Returns the eigenvalues of the (preconditioned) Hessian at x.
 % 
 % function lambdas = hessianspectrum(problem, x)
+% function lambdas = hessianspectrum(problem, x, K, SIGMA) % as in eigs
 % function lambdas = hessianspectrum(problem, x, useprecon)
 % function lambdas = hessianspectrum(problem, x, useprecon, storedb)
 % function lambdas = hessianspectrum(problem, x, useprecon, storedb, key)
@@ -138,6 +139,20 @@ function lambdas = hessianspectrum(problem, x, usepreconstr, storedb, key)
     n = length(vec(problem.M.zerovec(x)));
     dim = problem.M.dim();
     
+    % TODO: Need intelligent parsing of varargin
+    if ~exist('K','var') || isempty(K)
+      % compute all the eigenvalues (legacy behavior)
+      K = dim;
+      if K>n
+        warning('K cannot be bigger than the operator dimension n. Fixing to n')
+        K = n;
+      end
+    end
+    if ~exist('SIGMA','var') || isempty(SIGMA)
+      % get largest magnitude eigenvalues (legacy behavior)
+      SIGMA = 'LM';
+    end
+    
     % It is usually a good idea to force a gradient computation to make
     % sure precomputable things are precomputed.
     if canGetGradient(problem)
@@ -156,10 +171,11 @@ function lambdas = hessianspectrum(problem, x, usepreconstr, storedb, key)
     if ~useprecon
 
         % No preconditioner to use: simply use the Hessian as is.
-
+        
+        eigs_fun = hess_vec;
+        
         eigs_opts.issym = vec_mat_are_isometries;
         eigs_opts.isreal = true;
-        lambdas = eigs(hess_vec, n, dim, 'LM', eigs_opts);
             
     elseif canGetSqrtPrecon(problem)
 
@@ -168,12 +184,11 @@ function lambdas = hessianspectrum(problem, x, usepreconstr, storedb, key)
 
         sqrtprec = @(u_mat) tgt(getSqrtPrecon(problem, x, tgt(u_mat), storedb, key));
         sqrtprec_vec = @(u_vec) vec(sqrtprec(mat(u_vec)));
+        
+        eigs_fun = @(u_vec) sqrtprec_vec(hess_vec(sqrtprec_vec(u_vec)));
 
         eigs_opts.issym = vec_mat_are_isometries;
         eigs_opts.isreal = true;
-        lambdas = eigs(@(u_vec) ...
-                      sqrtprec_vec(hess_vec(sqrtprec_vec(u_vec))), ...
-                      n, dim, 'LM', eigs_opts);
             
     elseif canGetPrecon(problem)
             
@@ -183,17 +198,25 @@ function lambdas = hessianspectrum(problem, x, usepreconstr, storedb, key)
         prec = @(u_mat) tgt(getPrecon(problem, x, tgt(u_mat), storedb, key));
         prec_vec = @(u_vec) vec(prec(mat(u_vec)));
         % prec_inv_vec = @(u_vec) pcg(prec_vec, u_vec);
+        
+        eigs_fun = @(u_vec) prec_vec(hess_vec(u_vec));
 
         eigs_opts.issym = false;
         eigs_opts.isreal = true;
-        lambdas = eigs(@(u_vec) prec_vec(hess_vec(u_vec)), ...
-                       n, dim, 'LM', eigs_opts);
-        
+
     else
         
         error('No preconditioner is available in the problem structure.');
         
     end
+    if strcmp(SIGMA,'SM')
+      % If 'SM' case, we will need to solver the inverse linear operator
+      eigs_fun = @(u_vec) iterinv(eigs_fun,u_vec,eigs_opts);
+    end
+    
+    % call eigs with arguments established above
+    lambdas = eigs(eigs_fun, n, K, SIGMA, eigs_opts);
+    
     
     lambdas = sort(lambdas);
 
