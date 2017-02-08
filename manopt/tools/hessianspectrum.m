@@ -1,4 +1,4 @@
-function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, storedb, key)
+function [lambdas,V] = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, eigs_opts, storedb, key)
 % Returns the eigenvalues of the (preconditioned) Hessian at x.
 % 
 % function lambdas = hessianspectrum(problem, x)
@@ -221,7 +221,8 @@ function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, 
     end
     
     % call eigs with arguments established above
-    lambdas = eigs(eigs_fun, n, K, SIGMA, eigs_opts);
+    [V,D] = eigs(eigs_fun, n, K, SIGMA, eigs_opts);
+    lambdas = diag(D);
     
     if exist('shiftval', 'var') && ~isempty(shiftval)
       % if a shift was applied, undo it
