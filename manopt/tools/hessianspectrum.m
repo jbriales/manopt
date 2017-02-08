@@ -167,9 +167,9 @@ function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, 
     % isometry:
     vec_mat_are_isometries = problem.M.vecmatareisometries();
     
-    
+    % setup input for eigs command
     if ~useprecon
-
+      
         % No preconditioner to use: simply use the Hessian as is.
         
         eigs_fun = hess_vec;
@@ -209,6 +209,12 @@ function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, 
         error('No preconditioner is available in the problem structure.');
         
     end
+    if exist('shiftval', 'var') && ~isempty(shiftval)
+      % apply input shift if any
+      % NOTE: THIS IS HACK, CONSIDER WHAT YOU ARE DOING
+      eigs_fun = @(x) eigs_fun(x) + shiftval*x;
+    end
+    
     if strcmp(SIGMA,'SM')
       % If 'SM' case, we will need to solver the inverse linear operator
       eigs_fun = @(u_vec) iterinv(eigs_fun,u_vec,eigs_opts);
@@ -217,6 +223,10 @@ function lambdas = hessianspectrum(problem, x, K,SIGMA, usepreconstr, shiftval, 
     % call eigs with arguments established above
     lambdas = eigs(eigs_fun, n, K, SIGMA, eigs_opts);
     
+    if exist('shiftval', 'var') && ~isempty(shiftval)
+      % if a shift was applied, undo it
+      lambdas = lambdas - shiftval;
+    end
     
     lambdas = sort(lambdas);
 
