@@ -171,20 +171,20 @@ function M = stiefelstackedfactory(m, d, k)
     
     M.minvec = @minvec;
     M.minmat = @minmat;
-    function u = minvec(X,U,X_ort3)
+    function u = minvec(X,U)
       % reshape
       X3 = multitransp( to3D(X) );
       U3 = multitransp( to3D(U) );
       Maux = stiefelfactory(k, d, m);
       % call minvec in usual Stiefel factory
-      u = Maux.minvec(X3,U3,X_ort3);
+      u = Maux.minvec(X3,U3);
     end
-    function U = minmat(X,u,X_ort3)
+    function U = minmat(X,u)
       % reshape
       X3 = multitransp( to3D(X) );
       Maux = stiefelfactory(k, d, m);
-      % call minvec in usual Stiefel factory
-      U3t = Maux.minmat(X3,u,X_ort3);
+      % call minmat in usual Stiefel factory
+      U3t = Maux.minmat(X3,u);
       % reshape
       U = to2D(multitransp(U3t));
     end

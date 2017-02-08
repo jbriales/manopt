@@ -147,18 +147,32 @@ function M = stiefelfactory(n, p, k)
     M.mat = @(x, u_vec) reshape(u_vec, [n, p, k]);
     M.vecmatareisometries = @() true;
     
+    % 
     M.minvec = @minvec;
     M.minmat = @minmat;
-    % NOTE: These operators are curre
-    function u = minvec(X,U,X_ort)
-      % CAREFUL: Is null stable and repetitive as for not storing this base?
-      
-      if nargin < 3
+    persistent X_ort % shared among minvec and minmat
+    function computeBasis(X)
+      % Compute orthogonal complements to X_i necessary for basis
+      % Only applies if X is different from last execution
+      persistent last_X
+      if isempty(last_X) || ~isequal(last_X,X)
+        % if not done before
+        % compute the necessary terms for a basis at the current point X
+%         clear X_ort % reset persistent variable
+        X_ort = []; % reset persistent variable
         for i = 1 : k
           X_ort(:,:,i) = null(X(:,:,i)');
         end
+        % store current X for future references
+        last_X = X;
       end
+    end
+    function u = minvec(X,U)
       
+      % Setup necessary terms for a basis
+      computeBasis(X)
+      
+      % NOTE: This could be done faster with multi... functions in parallel
       c_u = cell(k,1);
       for i = 1 : k
         a = vec_skew( X(:,:,i)'*U(:,:,i) );
@@ -177,12 +191,11 @@ function M = stiefelfactory(n, p, k)
       %         B = avec(b,n-p,p);
       %         Ucheck = X*A + X_ort*B;
     end
-    function U = minmat(X,u,X_ort)
-      if nargin < 3
-        for i = 1 : k
-          X_ort(:,:,i) = null(X(:,:,i)');
-        end
-      end
+    function U = minmat(X,u)
+      
+      % Setup necessary terms for a basis
+      computeBasis(X)
+      
       c_u = mat2cell(u,M.dim()/k * ones(1,k),1);
       for i = 1 : k
         n_a = 0.5*p*(p-1);
